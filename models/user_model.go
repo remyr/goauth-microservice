@@ -20,8 +20,8 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-func (u User) CheckPasswordHash(hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(u.Password))
+func (u User) CheckPasswordHash(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 	return err == nil
 }
 
@@ -45,6 +45,10 @@ func (u User) GenerateToken() (string, error) {
 func (u User) Save(db *mgo.Database) error {
 	err := u.coll(db).Insert(u)
 	return err
+}
+
+func (u *User) FindByEmail(email string, db *mgo.Database) error {
+	return u.coll(db).Find(bson.M{"email": email}).One(u)
 }
 
 func (u User) coll(db *mgo.Database) *mgo.Collection {
