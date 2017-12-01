@@ -51,6 +51,14 @@ func (u *User) FindByEmail(email string, db *mgo.Database) error {
 	return u.coll(db).Find(bson.M{"email": email}).One(u)
 }
 
+func (u *User) FindByID(id string, db *mgo.Database) error {
+	return u.coll(db).FindId(bson.ObjectIdHex(id)).One(u)
+}
+
+func (u *User) RemoveById(db *mgo.Database) error {
+	return u.coll(db).RemoveId(u.ID)
+}
+
 func (u User) coll(db *mgo.Database) *mgo.Collection {
 	return db.C("users")
 }

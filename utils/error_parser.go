@@ -1,21 +1,33 @@
 package utils
 
 import (
-	"log"
-	"strings"
 	"regexp"
+	"fmt"
 )
 
-func ParseDuplicateKey() {
-	var e = "E11000 duplicate key error collection: goauth_microservice.users index: email_1 dup key: { : \"rivals.remy@gmail.com\" }"
-	var stp1 = strings.Split(e, "index: ")[1]
-	var stp2 = strings.Split(stp1, " dup key")[0]
-	var i = strings.Index(stp2, "_")
-	var result = stp2[:i]
+func ParseDupError() {
+	//var re = regexp.MustCompile(`index:\s(?P<Key>[a-z]+).*{\s:\s\\"(?P<Value>[a-z.@" "]+)`)
+    var str = `E11000 duplicate key error collection: goauth_microservice.users index: email_1 dup key: { : \"rivals.remy@gmail.com\" }`
+	//
+    ////for i, match := range re.FindAllString(str, -1) {
+    ////    fmt.Println(match, "found at index", i)
+    ////}
+    //fmt.Println(re.FindStringSubmatch(str))
+    params := getParams(`index:\s(?P<Key>[a-z]+).*{\s:\s\\"(?P<Value>[a-z.@" "]+)`, str)
+	fmt.Println(params["Key"])
+	fmt.Println(params["Value"])
+}
 
-	r, _ := regexp.Compile(`index:\s([a-z]+).*{\s:\s\\"([a-z.@" "]+)`)
-	res := r.FindAllString(e, -1)
+func getParams(regEx, url string) (paramsMap map[string]string) {
 
-	log.Printf("%s", result)
-	log.Printf("%s", res)
+    var compRegEx = regexp.MustCompile(regEx)
+    match := compRegEx.FindStringSubmatch(url)
+
+    paramsMap = make(map[string]string)
+    for i, name := range compRegEx.SubexpNames() {
+        if i > 0 && i <= len(match) {
+            paramsMap[name] = match[i]
+        }
+    }
+    return
 }
