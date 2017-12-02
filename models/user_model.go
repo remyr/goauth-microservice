@@ -6,18 +6,28 @@ import (
 	"time"
 	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/mgo.v2"
+	"github.com/satori/go.uuid"
 )
 
 type User struct {
-	ID			bson.ObjectId	`json:"id" bson:"_id"`
-	Username	string 			`json:"username omitempty"`
-	Email    	string 			`json:"email" binding:"required"`
-	Password 	string 			`json:"password" binding:"required"`
+	ID					bson.ObjectId	`json:"id" bson:"_id"`
+	Username			string 			`json:"username,omitempty" bson:"username,omitempty"`
+	Email    			string 			`json:"email" binding:"required"`
+	Password 			string 			`json:"password" binding:"required"`
+	ValidationToken		string			`json:"validationToken" bson:"validationToken"`
+	IsActive			bool			`json:"isActive" bson:"isActive"`
 }
 
 type Claims struct {
 	Email string `json:"email"`
 	jwt.StandardClaims
+}
+
+func NewUser() *User {
+	return &User{
+		ValidationToken: uuid.NewV4().String(),
+		IsActive: false,
+	}
 }
 
 func (u User) CheckPasswordHash(password string) bool {
@@ -43,8 +53,16 @@ func (u User) GenerateToken() (string, error) {
 }
 
 func (u User) Save(db *mgo.Database) error {
-	err := u.coll(db).Insert(u)
-	return err
+	if !u.ID.Valid() {
+		// Creation save
+		u.ID = bson.NewObjectId()
+		err := u.coll(db).Insert(u)
+		return err
+	} else {
+		// Update save
+		err := u.coll(db).UpdateId(u.ID, u)
+		return err
+	}
 }
 
 func (u *User) FindByEmail(email string, db *mgo.Database) error {
@@ -53,6 +71,10 @@ func (u *User) FindByEmail(email string, db *mgo.Database) error {
 
 func (u *User) FindByID(id string, db *mgo.Database) error {
 	return u.coll(db).FindId(bson.ObjectIdHex(id)).One(u)
+}
+
+func (u *User) FindByToken(token string, db *mgo.Database) error {
+	return u.coll(db).Find(bson.M{"validationToken": token}).One(u)
 }
 
 func (u *User) RemoveById(db *mgo.Database) error {

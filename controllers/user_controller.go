@@ -21,6 +21,10 @@ type token_response struct {
 	Token	string	`json:"token"`
 }
 
+type error_response struct {
+	Error 	string	`json:"error"`
+}
+
 // Create a new controller
 func NewUserController(database utils.DatabaseAccessor) *UserControllerImpl {
 	return &UserControllerImpl{database}
@@ -28,35 +32,34 @@ func NewUserController(database utils.DatabaseAccessor) *UserControllerImpl {
 
 // Register routes for UserController
 func (uc *UserControllerImpl) Register(router *gin.Engine) {
+	router.POST("/login", uc.signin)
+	router.POST("/register", uc.signup)
+	router.GET("/verify-account", uc.verify)
 	g := router.Group("/user")
 	{
-		g.POST("/login", uc.signin)
-		g.POST("/register", uc.signup)
 		g.DELETE("/:id", uc.del)
 	}
 }
 
 func (uc *UserControllerImpl) signup (ctx *gin.Context) {
-	var u models.User
+	u := models.NewUser()
 
 	if err := ctx.BindJSON(&u); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, error_response{err.Error()})
 		return
 	}
 
 	hash, err := u.HashPassword()
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, error_response{err.Error()})
 		return
 	}
 
 	u.Password = hash
-	u.ID = bson.NewObjectId()
-
 	saveErr := u.Save(uc.database.GetDB())
 
 	if saveErr != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": saveErr.Error()})
+		ctx.JSON(http.StatusBadRequest, error_response{saveErr.Error()})
 		return
 	}
 
@@ -68,17 +71,22 @@ func (uc *UserControllerImpl) signin (ctx *gin.Context) {
 	var u = new(models.User)
 
 	if err := ctx.BindJSON(&data); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, error_response{err.Error()})
 		return
 	}
 
 	if u.FindByEmail(data.Email, uc.database.GetDB()); !u.ID.Valid() {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		ctx.JSON(http.StatusNotFound, error_response{"user not found"})
 		return
 	}
 
 	if !u.CheckPasswordHash(data.Password) {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid credentials"})
+		ctx.JSON(http.StatusBadRequest, error_response{"invalid credentials"})
+		return
+	}
+
+	if !u.IsActive {
+		ctx.JSON(http.StatusBadRequest, error_response{"user is not active"})
 		return
 	}
 
@@ -91,19 +99,41 @@ func (uc *UserControllerImpl) del (ctx *gin.Context) {
 	u := new(models.User)
 
 	if !bson.IsObjectIdHex(id) {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		ctx.JSON(http.StatusBadRequest, error_response{"invalid user id"})
 		return
 	}
 
 	if u.FindByID(id, uc.database.GetDB()); !u.ID.Valid() {
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		ctx.JSON(http.StatusNotFound, error_response{"user not found"})
 		return
 	}
 
 	if err := u.RemoveById(uc.database.GetDB()); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, error_response{err.Error()})
 		return
 	}
 
 	ctx.JSON(http.StatusNoContent, gin.H{})
+}
+
+func (uc *UserControllerImpl) verify (ctx *gin.Context) {
+	token := ctx.Query("token")
+	u := new(models.User)
+	if len(token) < 1 {
+		ctx.String(http.StatusBadRequest, "unable to verify account")
+		return
+	}
+	if u.FindByToken(token, uc.database.GetDB()); !u.ID.Valid() {
+		ctx.String(http.StatusBadRequest, "unable to verify account")
+		return
+	}
+
+	u.IsActive = true
+	u.ValidationToken = ""
+	if err:= u.Save(uc.database.GetDB()); err != nil {
+		ctx.String(http.StatusBadRequest, "error")
+		return
+	}
+
+	ctx.String(http.StatusOK, "account verified " + token)
 }
