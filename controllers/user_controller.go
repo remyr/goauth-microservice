@@ -119,10 +119,12 @@ func (uc *UserControllerImpl) del (ctx *gin.Context) {
 func (uc *UserControllerImpl) verify (ctx *gin.Context) {
 	token := ctx.Query("token")
 	u := new(models.User)
+
 	if len(token) < 1 {
 		ctx.String(http.StatusBadRequest, "unable to verify account")
 		return
 	}
+
 	if u.FindByToken(token, uc.database.GetDB()); !u.ID.Valid() {
 		ctx.String(http.StatusBadRequest, "unable to verify account")
 		return
@@ -135,5 +137,5 @@ func (uc *UserControllerImpl) verify (ctx *gin.Context) {
 		return
 	}
 
-	ctx.String(http.StatusOK, "account verified " + token)
+	ctx.String(http.StatusOK, "account verified ")
 }

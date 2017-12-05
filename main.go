@@ -5,9 +5,18 @@ import (
 	"github.com/remyr/goauth-microservice/web"
 )
 
+//func init() {
+//	err := godotenv.Load()
+//	if err != nil {
+//		log.Fatal("Error loading .env file")
+//	}
+//}
+
 func main() {
-	dbAccessor := utils.NewDatabaseAccessor("mongodb://localhost:27017", "goauth_microservice")
+	config := utils.LoadConfiguration("config.json")
+	dbAccessor := utils.NewDatabaseAccessor(config.Database.Host, config.Database.Name)
+
 	s := web.NewServer(*dbAccessor)
 
-	s.Run(":8000")
+	s.Run(config.Port)
 }

@@ -12,13 +12,16 @@ type DatabaseAccessor struct {
 }
 
 func NewDatabaseAccessor(url string, name string) *DatabaseAccessor {
-	session, _ := mgo.Dial(url)
+	db_host := GetEnv("DB_HOST", url)
+	db_name := GetEnv("DB_NAME", name)
+
+	session, _ := mgo.Dial(db_host)
 	session.SetSafe(&mgo.Safe{})
 	session.SetMode(mgo.Monotonic, true)
 
-	addIndexes(session, name)
+	addIndexes(session, db_name)
 
-	return &DatabaseAccessor{session, url, name}
+	return &DatabaseAccessor{session, url, db_name}
 }
 
 func (dba *DatabaseAccessor) GetDB() *mgo.Database {
@@ -43,5 +46,4 @@ func addIndexes(s *mgo.Session, dbname string) {
 	if err != nil {
 		log.Fatalf("[addIndex]: %s\n", err)
 	}
-
 }
